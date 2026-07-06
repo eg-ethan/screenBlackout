@@ -93,6 +93,10 @@ namespace ScreenBlackout
             {
                 ShowBlackout();
             }
+            else
+            {
+                MemoryTrimmer.Trim();
+            }
         }
 
         private void ShowBlackout()
@@ -131,6 +135,7 @@ namespace ScreenBlackout
                 form.Close();
                 form.Dispose();
             }
+            MemoryTrimmer.Trim();
         }
 
         private void ExitApp()
@@ -140,6 +145,34 @@ namespace ScreenBlackout
             _trayIcon.Dispose();
             _hotkeyWindow.Dispose();
             ExitThread();
+        }
+    }
+
+    /// <summary>
+    /// Keeps the idle footprint small. The CLR holds on to startup and
+    /// blackout-session allocations even when the app is just waiting in the
+    /// tray; a GC plus a working-set trim releases them back to the OS.
+    /// </summary>
+    internal static class MemoryTrimmer
+    {
+        [DllImport("kernel32.dll")]
+        private static extern IntPtr GetCurrentProcess();
+
+        [DllImport("kernel32.dll")]
+        private static extern bool SetProcessWorkingSetSize(IntPtr process, IntPtr min, IntPtr max);
+
+        public static void Trim()
+        {
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+            try
+            {
+                // min/max of -1 tells Windows to empty the working set; pages
+                // still in use fault back in on demand.
+                SetProcessWorkingSetSize(GetCurrentProcess(), (IntPtr)(-1), (IntPtr)(-1));
+            }
+            catch { }
         }
     }
 

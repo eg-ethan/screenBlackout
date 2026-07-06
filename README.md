@@ -36,5 +36,6 @@ Produces a portable, dependency-free `ScreenBlackout.exe`.
 - Declares per-monitor DPI awareness before creating windows, so scaled displays (125%/150%) are fully covered with no gaps.
 - Registers a global `RegisterHotKey` (Ctrl + Numpad 9) on a hidden message window; the handler additionally checks `GetAsyncKeyState(VK_LCONTROL)` so only **left** Ctrl triggers it.
 - Closing any one blackout window (Esc, double-click, Alt+F4) hides them all; the tray icon owns the process lifetime.
+- Trims its working set after startup and every time the blackout is dismissed, so it idles in the tray at ~1–3 MB.
 
 See [PRD.md](PRD.md) for the full product requirements.
