@@ -38,6 +38,8 @@ The app is launched once and stays resident in the system tray: dismissing the b
 | FR-9 | The app is per-monitor DPI aware so scaled displays (125%/150%) are still fully covered with no gaps. |
 | FR-10 | Blackout windows show no taskbar buttons; the tray icon is the app's only persistent UI. |
 | FR-11 | If the hotkey cannot be registered (owned by another app), the user is notified via a tray balloon and can still use the tray menu. |
+| FR-12 | A **Start with Windows** tray toggle registers/unregisters a per-user auto-start (HKCU Run key), launching with `--tray` so login starts quietly in the tray with the hotkey armed — no blackout at login. |
+| FR-13 | The `--tray` command-line flag starts the app resident in the tray without an initial blackout. |
 
 ## 5. Technical Requirements
 

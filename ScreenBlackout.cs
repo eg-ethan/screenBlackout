@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
+using Microsoft.Win32;
 
 namespace ScreenBlackout
 {
@@ -29,12 +30,18 @@ namespace ScreenBlackout
         }
 
         [STAThread]
-        private static void Main()
+        private static void Main(string[] args)
         {
+            // --tray: start resident in the tray without blacking out (used by
+            // the "Start with Windows" registration so logins aren't blacked out).
+            bool startHidden = Array.Exists(args,
+                a => a.Equals("--tray", StringComparison.OrdinalIgnoreCase)
+                  || a.Equals("/tray", StringComparison.OrdinalIgnoreCase));
+
             EnableDpiAwareness();
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new BlackoutAppContext());
+            Application.Run(new BlackoutAppContext(startHidden));
         }
     }
 
@@ -49,12 +56,20 @@ namespace ScreenBlackout
         private readonly HotkeyWindow _hotkeyWindow;
         private readonly List<BlackoutForm> _forms = new List<BlackoutForm>();
 
-        public BlackoutAppContext()
+        public BlackoutAppContext(bool startHidden)
         {
             _hotkeyWindow = new HotkeyWindow(ShowBlackout);
 
             var menu = new ContextMenuStrip();
             menu.Items.Add("Black out now  (Left Ctrl + Numpad 9)", null, (s, e) => ShowBlackout());
+            menu.Items.Add(new ToolStripSeparator());
+            var startupItem = new ToolStripMenuItem("Start with Windows")
+            {
+                CheckOnClick = true,
+                Checked = StartupRegistration.IsEnabled(),
+            };
+            startupItem.CheckedChanged += (s, e) => StartupRegistration.SetEnabled(startupItem.Checked);
+            menu.Items.Add(startupItem);
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add("Exit", null, (s, e) => ExitApp());
 
@@ -74,7 +89,10 @@ namespace ScreenBlackout
                     "Use the tray icon to black out instead.", ToolTipIcon.Warning);
             }
 
-            ShowBlackout();
+            if (!startHidden)
+            {
+                ShowBlackout();
+            }
         }
 
         private void ShowBlackout()
@@ -122,6 +140,60 @@ namespace ScreenBlackout
             _trayIcon.Dispose();
             _hotkeyWindow.Dispose();
             ExitThread();
+        }
+    }
+
+    /// <summary>
+    /// Manages the per-user "Start with Windows" registration (HKCU Run key).
+    /// Registered with --tray so logins start quietly in the tray instead of
+    /// blacking out the screens.
+    /// </summary>
+    internal static class StartupRegistration
+    {
+        private const string RunKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
+        private const string ValueName = "ScreenBlackout";
+
+        private static string Command
+        {
+            get { return "\"" + Application.ExecutablePath + "\" --tray"; }
+        }
+
+        public static bool IsEnabled()
+        {
+            try
+            {
+                using (RegistryKey key = Registry.CurrentUser.OpenSubKey(RunKeyPath))
+                {
+                    return key != null && key.GetValue(ValueName) as string == Command;
+                }
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        public static void SetEnabled(bool enabled)
+        {
+            try
+            {
+                using (RegistryKey key = Registry.CurrentUser.CreateSubKey(RunKeyPath))
+                {
+                    if (enabled)
+                    {
+                        key.SetValue(ValueName, Command);
+                    }
+                    else
+                    {
+                        key.DeleteValue(ValueName, false);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Could not update the startup setting:\n" + ex.Message,
+                    "Screen Blackout", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
         }
     }
 
